@@ -1,7 +1,7 @@
 function icaAUCcomp(job_id)
 
-% This function computes the AUC values of each ICA component under
-% different pre/post-nap performances
+% This function computes the AUC values of each ICA component for content  
+% (left/right) decoding under different pre/post-nap performances
 
 
 %--------
@@ -13,7 +13,7 @@ conds = {'10'};
 
 
 % add auxiliary functions for EEG processing and analysis
-addpath(genpath('/mnt/bucket/people/boyuw/code'));
+addpath(genpath('/mnt/bucket/people/boyuw/code/utilities'));
 
 
 
@@ -25,14 +25,14 @@ load(['/mnt/bucket/labs/norman/jantony/motorExp/analysis/',filename])
 
 
 
-% read the task ID for parallel computing
+% read the task ID for parallel computing, so is the component index
 SGE_TASK_ID = str2double(getenv('SLURM_ARRAY_TASK_ID'));%SLURM
 so = SGE_TASK_ID;    
 
 
 
 X = squeeze(data_a_a(:,so,:));              % ICAed EEG signals
-Y = inds_a;                                 % class labels
+Y = inds_a;                                 % class labels - left/right
 Y(Y==2) = -1;
 
 clear data_a_a;
@@ -54,7 +54,8 @@ empty_id = zeros(numSub,2);
 
 
 for i = 1:numSub
-    % extract the EEG signals of the i-th subject
+    
+    % extract the ICAed EEG signals of the i-th subject
     Idx = subID(i);
     Xi = X(rows_a == Idx,:);
     yi = Y(rows_a == Idx);
@@ -62,24 +63,24 @@ for i = 1:numSub
     
     
     % extract the EEG signals under different conditions
-    tmpX = [];
-    ytmp = [];
+    Xica = [];
+    yica = [];
     for c = 1:numConds
-        [Xc, yc] = ICAedEEGPrepare(Xi,yi,ref,conds{c});
-        tmpX = cat(1,tmpX,Xc);
-        ytmp = cat(1,ytmp,yc);
+        [Xc, yc] = ICAedEEGPrepare(Xi,yi,ref,conds{c});                    % extract the ICAed L/R EEG signals with specific conditions (e.g., 11, 10)
+        Xica = cat(1,Xica,Xc);
+        yica = cat(1,yica,yc);
     end
     
     % compute the AUC values at different time points, with different window lengths
-    if length(unique(ytmp))>1
+    if length(unique(yica))>1
         for j = 1:numW
             wid = width(j);
             for k = 1:numT
                 endIdx = min(k+wid-1,numT);
-                tmpx = tmpX(:,k:endIdx);
+                tmpx = Xica(:,k:endIdx);
                 tmpx = mean(tmpx,2);    % average the signals over time
 
-                [~,~,~,A] = perfcurve(ytmp,tmpx,1);
+                [~,~,~,A] = perfcurve(yica,tmpx,1);
                 AUC(i,j,k) = A;
             end
         end
@@ -90,7 +91,7 @@ for i = 1:numSub
 end
 
 clear X
-clear tmpX
+clear Xica
 clear Xc
 clear Xi
 clear tmpx
@@ -100,6 +101,7 @@ condname = [];
 for c = 1:numConds
     condname = [condname,conds{c}];
 end
+
 % save the results
 resultpath = '/mnt/bucket/labs/norman/boyuw/results/Results2017_06_05/LR/partial_ICA_AUCcheck/';
 mkdir(resultpath);
