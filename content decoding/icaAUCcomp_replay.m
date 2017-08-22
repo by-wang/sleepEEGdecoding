@@ -46,7 +46,7 @@ filename = 'Boyu-1-0-0-0-3-1';
 load(['/mnt/bucket/labs/norman/jantony/motorExp/analysis/',filename]);
 
 
-% read the task ID for parallel computing, so is the component index
+% read the task ID for parallel computing, so is the ICA component index
 SGE_TASK_ID = str2double(getenv('SLURM_ARRAY_TASK_ID'));%SLURM
 so = SGE_TASK_ID;   
 
@@ -89,7 +89,7 @@ for nf = 1:numSub
     [Y_hat,y_true] = loadReplay(replaypath,list,Idx);                      % load the output of the replay classifier for the nf-th subject                  
     
     
-    if isempty(y_true)                                                     % if the subject is found in the replay results
+    if isempty(y_true)                                                     % check if the subject is found in the replay results
         empty_id(:,nf,1) = 1;
         empty_id(:,nf,2) = Idx;
         AUC(nf,:,:,:) = nan;
@@ -119,7 +119,7 @@ for nf = 1:numSub
         
         
         numTrial = length(yica);
-        if length(unique(yica))>1                                          % if the data set contain the EEG signals from both classes (i.e., left/right)
+        if length(unique(yica))>1                                          % check if the data set contain the EEG signals from both classes (i.e., left/right)
             
             % compute the AUC values at different time points, with
             % different window lengths and ratios

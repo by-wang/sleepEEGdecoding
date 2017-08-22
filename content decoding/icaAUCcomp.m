@@ -25,7 +25,7 @@ load(['/mnt/bucket/labs/norman/jantony/motorExp/analysis/',filename])
 
 
 
-% read the task ID for parallel computing, so is the component index
+% read the task ID for parallel computing, so is the ICA component index
 SGE_TASK_ID = str2double(getenv('SLURM_ARRAY_TASK_ID'));%SLURM
 so = SGE_TASK_ID;    
 
