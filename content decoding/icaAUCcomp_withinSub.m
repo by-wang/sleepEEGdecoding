@@ -1,9 +1,10 @@
-function icaAUCcomp_LOSO(job_id)
+function icaAUCcomp_withinSub(job_id)
 
 % This function computes the AUC values of each ICA component for content 
-% decoding (left/right) using leave-one-subject-out (LOSO) classifier. Each
-% time it leaves one subject as the testing data, using other subjects as
-% training data to train a logistic regression classifier.
+% decoding (left/right) using within subject (withinSub) classifier. Each
+% time it takes one subject, leaves one trial out as the testing sample,
+% using the rest trials as the training samples to train a logistic
+% regression classifier
 
 
 
@@ -77,8 +78,8 @@ A2 = zeros(numSub,numW,numT);
 
 
 
-Xi = cell(1,numSub);
-Yi = cell(1,numSub);
+% Xi = cell(1,numSub);
+% Yi = cell(1,numSub);
 
 
 for i = 1:numSub
@@ -99,8 +100,57 @@ for i = 1:numSub
         yica = cat(1,yica,yc);
     end
     
-    Xi{i} = Xica;
-    Yi{i} = yica;
+    N = length(yica);               % number of trials
+    
+    
+    for j = 1:numW
+        wid = width(j);
+        for k = 1:numT
+            endIdx = min(k+wid-1,numT);
+            
+            Xtemp = Xica(:,k:endIdx);
+            Xtemp = mean(Xtemp,2);
+            
+            y_hat = nan(N,1);
+            h = nan(N,1);
+            y_true = nan(N,1);
+            acc = nan(N,1);
+            for n = 1:N
+                Xtrain = Xtemp;
+                Xtrain(n) = [];
+                Xtest = Xtemp(n);
+                
+                ytrain = yica;
+                ytrain(n) = [];
+                ytest = yica(n);
+            
+%             Xte = Xtest(:,k:endIdx);
+%             Xte = mean(Xte,2);
+                numPos = length(find(ytrain == 1));
+                numNeg = length(find(ytrain == -1));
+                opts.sWeight(1) = numNeg/(numPos+numNeg);
+                opts.sWeight(2) = numPos/(numPos+numNeg);
+                [w_train, c_train, ~, ~]= LogisticR(Xtrain, ytrain, 0.000000001, opts);    % training
+
+                h(n) = sign(Xtest*w_train+c_train);                                          % testing
+                acc(n) = sum((h-ytest)==0)/length(ytest);
+                y_hat(n) = 1./ (1+ exp(-(Xtest*w_train+c_train) ) );
+                y_true(n) = ytest;
+            end
+            
+            
+            total_acc(i,j,k) = mean(acc);                       % accuracy 
+            Y_hat{i,j,k} = y_hat;
+            Y_true{i,j,k} = y_true;
+            
+            [~,~,~,A1(i,j,k)] = perfcurve(y_true,Xtemp,1);         % AUC based on features and labels
+            [~,~,~,A2(i,j,k)] = perfcurve(y_true,y_hat,1);       % AUC based on LOSO classifier and labels
+            
+        end
+    end
+    
+    
+
 end
 
 clear Xica
@@ -108,53 +158,6 @@ clear yica
 
 
 
-for i = 1:numSub
-    
-    
-    % Prepare the training and testing data
-    Xtest = Xi{i};
-    ytest = Yi{i};
-    
-    Xtrain = [];
-    ytrain = [];
-    
-    for ii = 1:numSub
-        if ii ~= i
-            Xtrain = cat(1,Xtrain,Xi{ii});
-            ytrain = cat(1,ytrain,Yi{ii});
-        end
-    end
-    
-    
-    % compute the AUC values at different time points, with different window lengths
-    for j = 1:numW
-        wid = width(j);
-        for k = 1:numT
-            endIdx = min(k+wid-1,numT);
-            
-            Xtr = Xtrain(:,k:endIdx);
-            Xtr = mean(Xtr,2);
-            
-            Xte = Xtest(:,k:endIdx);
-            Xte = mean(Xte,2);
-            [w_train, c_train, ~, ~]= LogisticR(Xtr, ytrain, 0.000000001, opts);    % training
-
-            h = sign(Xte*w_train+c_train);                                          % testing
-            acc = sum((h-ytest)==0)/length(ytest);
-            y_hat = 1./ (1+ exp(-(Xte*w_train+c_train) ) );
-            y_true = ytest;
-            
-            
-            total_acc(i,j,k) = mean(acc);                       % accuracy 
-            Y_hat{i,j,k} = y_hat;
-            Y_true{i,j,k} = y_true;
-            
-            [~,~,~,A1(i,j,k)] = perfcurve(ytest,Xte,1);         % AUC based on features and labels
-            [~,~,~,A2(i,j,k)] = perfcurve(ytest,y_hat,1);       % AUC based on LOSO classifier and labels
-            
-        end
-    end
-end
 
 clear X
 clear Xtrain
@@ -169,8 +172,6 @@ condname = [];
 for c = 1:numConds
     condname = [condname,conds{c}];
 end
-
-
 
 
 % save the results
